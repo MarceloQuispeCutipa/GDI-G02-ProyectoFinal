@@ -4,9 +4,7 @@ session_start();
 require_once "conexion.php";
 require_once "header.php";
 
-// -----------------------------
-// Helpers
-// -----------------------------
+
 function escape_html($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
 
 function output_table_from_result($rows) {
@@ -43,9 +41,6 @@ function export_csv($rows, $filename = 'reporte.csv') {
     fclose($out); exit;
 }
 
-// -----------------------------
-// Reportes configurados
-// -----------------------------
 $reports = [];
 
 /* 1) Pedidos con cliente y empleado */

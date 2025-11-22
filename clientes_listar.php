@@ -18,12 +18,13 @@ require_once "header.php";
         <?php
         $sql = "
             SELECT 
-                c.ruc_cliente,
+                c.RUC_Cliente AS ruc_cliente,
                 cn.nombre_cliente,
                 cd.direccion_del_cliente
-            FROM cliente c
-            JOIN cliente_nombre cn ON cn.id_nombre_cliente = c.id_nombrecliente
-            JOIN cliente_direccion cd ON cd.id_direccioncliente = c.id_direccioncliente
+            FROM Cliente c
+            LEFT JOIN Cliente_Nombre cn ON cn.id_nombre_cliente = c.ID_NombreCliente
+            LEFT JOIN Cliente_Direccion cd ON cd.id_direccioncliente = c.ID_DireccionCliente
+            ORDER BY c.RUC_Cliente
         ";
 
         $resultado = $conexion->query($sql);

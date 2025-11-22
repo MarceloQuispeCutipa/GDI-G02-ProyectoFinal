@@ -2,7 +2,7 @@
 // pedidos.php
 session_start();
 require_once "conexion.php";
-require_once "header.php"; // si tienes cabecera común
+require_once "header.php"; 
 
 // Opcional: logo local (imagen que subiste)
 $logo_local = "/mnt/data/WhatsApp Image 2025-10-01 at 23.05.57_91a09c05.jpg";
@@ -19,7 +19,7 @@ $empleados = $conexion->query("SELECT DNI, Nombre FROM Empleado ORDER BY Nombre"
 
 $productos = $conexion->query("SELECT idProducto, Descripcion_del_producto FROM Producto ORDER BY Descripcion_del_producto")->fetch_all(MYSQLI_ASSOC);
 
-// --- Recibir filtros (GET) ---
+// --- Recibir filtros ---
 $fecha_exacta = $_GET['fecha'] ?? "";
 $desde = $_GET['desde'] ?? "";
 $hasta = $_GET['hasta'] ?? "";
@@ -81,7 +81,7 @@ if (!empty($where)) {
     $where_sql = "WHERE " . implode(" AND ", $where);
 }
 
-// --- Contar (para paginación) ---
+
 $sqlCount = "
 SELECT COUNT(*) AS tot
 FROM Pedido p
@@ -105,7 +105,7 @@ $stmtCount->close();
 
 $totalPages = max(1, ceil($totalRows / $perPage));
 
-// --- Consulta principal: 1 fila por producto del pedido (no GROUP BY) ---
+
 $sql = "
 SELECT
     p.Nombre_de_la_hoja,
@@ -138,7 +138,7 @@ LIMIT ? OFFSET ?
 
 $stmt = $conexion->prepare($sql);
 
-// bind parameters: first types + perPage + offset
+
 if ($types !== "") {
     $final_types = $types . "ii";
     $final_params = array_merge($params, [$perPage, $offset]);

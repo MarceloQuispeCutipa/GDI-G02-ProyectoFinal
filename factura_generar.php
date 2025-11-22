@@ -7,10 +7,7 @@ require_once "conexion.php";
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-/*
-  Manejo del botón "Vaciar carrito".
-  Tu UI envía este botón al mismo script; si se detecta, vaciamos y volvemos.
-*/
+
 if (isset($_POST['vaciar_carrito'])) {
     unset($_SESSION['carrito']);
     // Redirigir de vuelta a la página previa si existe
@@ -104,8 +101,7 @@ try {
     $valor_venta_int = (int) round($subtotal);
     $sub_total_int = (int) round($subtotal);
 
-    // Tipos: s s i i i i s s  => "ssi iiiss" -> compact: "siiiisss"? We'll build exact:
-    // Parameters order: numero_factura (s), tipo_moneda (s), Importe_total (i), IGV (i), Valor_venta (i), Sub_total_ventas (i), ruc_empresa (s), dni_empleado (s)
+   
     $stmt->bind_param("siiiisss",
         $numero_factura,
         $tipo_moneda,
@@ -128,14 +124,14 @@ try {
     $stmt->execute();
     $stmt->close();
 
-    // Insertar Pedido_Producto (cada producto => una fila). ID_Pedido_Producto será PP + contador
+
     $stmt = $conexion->prepare("
         INSERT INTO Pedido_Producto (ID_Pedido_Producto, NombreDeLaHoja_Pedido, Cantidad, ID_Producto)
         VALUES (?, ?, ?, ?)
     ");
     $contador = 1;
     foreach ($_SESSION['carrito'] as $item) {
-        $idPedidoProd = 'PP' . str_pad($contador, 2, "0", STR_PAD_LEFT); // PP01..
+        $idPedidoProd = 'PP' . str_pad($contador, 2, "0", STR_PAD_LEFT); 
         $cantidad = intval($item['cantidad']);
         $idProducto = $item['id'];
         $stmt->bind_param("ssis", $idPedidoProd, $nombreHoja, $cantidad, $idProducto);
@@ -144,7 +140,7 @@ try {
     }
     $stmt->close();
 
-    // Insertar Precios_Pedido (ID_Precios = max+1)
+
     $res = $conexion->query("SELECT COALESCE(MAX(ID_Precios),0)+1 AS next_id FROM Precios_Pedido");
     $row = $res->fetch_assoc();
     $nextPrecioId = intval($row['next_id']);
@@ -153,7 +149,7 @@ try {
         INSERT INTO Precios_Pedido (ID_Precios, NombreDeLaHoja_Pedido, Costo_Total, Precio_sin_IGV, Precio_total)
         VALUES (?, ?, ?, ?, ?)
     ");
-    // En tu esquema esos campos son VARCHAR; guardamos cadenas con dos decimales
+
     $costo_total_str = number_format($subtotal, 2, '.', '');
     $precio_sin_igv_str = number_format($subtotal, 2, '.', '');
     $precio_total_str = number_format($total, 2, '.', '');
@@ -165,7 +161,7 @@ try {
     // Commit
     $conexion->commit();
 
-    // Guardar respaldo para mostrar en factura (opcional)
+    // Guardar respaldo para mostrar en factura
     $_SESSION['carrito_backup'] = $_SESSION['carrito'];
     $_SESSION['numero_factura'] = $numero_factura;
     $_SESSION['cliente_factura'] = $ruc_cliente;

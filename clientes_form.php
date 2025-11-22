@@ -8,8 +8,8 @@ $cliente = [
     'ruc_cliente' => '',
     'nombre_cliente' => '',
     'direccion_del_cliente' => '',
-    'id_nombrecliente' => '',
-    'id_direccioncliente' => ''
+    'ID_NombreCliente' => '',
+    'ID_DireccionCliente' => ''
 ];
 
 $modo = "nuevo";
@@ -17,15 +17,15 @@ $modo = "nuevo";
 if ($ruc != '') {
     $stmt = $conexion->prepare("
         SELECT 
-            c.ruc_cliente,
-            c.id_nombrecliente,
-            c.id_direccioncliente,
+            c.RUC_Cliente,
+            c.ID_NombreCliente,
+            c.ID_DireccionCliente,
             cn.nombre_cliente,
             cd.direccion_del_cliente
-        FROM cliente c
-        JOIN cliente_nombre cn ON cn.id_nombre_cliente = c.id_nombrecliente
-        JOIN cliente_direccion cd ON cd.id_direccioncliente = c.id_direccioncliente
-        WHERE c.ruc_cliente = ?
+        FROM Cliente c
+        LEFT JOIN Cliente_Nombre cn ON cn.id_nombre_cliente = c.ID_NombreCliente
+        LEFT JOIN Cliente_Direccion cd ON cd.id_direccioncliente = c.ID_DireccionCliente
+        WHERE c.RUC_Cliente = ?
     ");
 
     $stmt->bind_param("s", $ruc);
@@ -48,7 +48,7 @@ if ($ruc != '') {
 
         <label for="ruc_cliente">RUC:</label>
         <input type="text" name="ruc_cliente" id="ruc_cliente" maxlength="11"
-               value="<?php echo htmlspecialchars($cliente['ruc_cliente']); ?>"
+               value="<?php echo htmlspecialchars($cliente['RUC_Cliente'] ?? $cliente['ruc_cliente']); ?>"
                <?php echo ($modo == "editar") ? "readonly" : ""; ?>
                required>
 
@@ -60,8 +60,8 @@ if ($ruc != '') {
         <input type="text" name="direccion_del_cliente" id="direccion_del_cliente"
                value="<?php echo htmlspecialchars($cliente['direccion_del_cliente']); ?>" required>
 
-        <input type="hidden" name="id_nombre" value="<?php echo $cliente['id_nombrecliente']; ?>">
-        <input type="hidden" name="id_direccion" value="<?php echo $cliente['id_direccioncliente']; ?>">
+        <input type="hidden" name="id_nombre" value="<?php echo $cliente['ID_NombreCliente']; ?>">
+        <input type="hidden" name="id_direccion" value="<?php echo $cliente['ID_DireccionCliente']; ?>">
         <input type="hidden" name="modo" value="<?php echo $modo; ?>">
 
         <button type="submit" class="btn btn-guardar">Guardar</button>

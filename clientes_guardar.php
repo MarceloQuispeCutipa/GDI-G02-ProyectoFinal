@@ -8,44 +8,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $direccion = $_POST['direccion_del_cliente'];
     $modo = $_POST['modo'];
 
-    $id_nombre = $_POST['id_nombre'];
-    $id_direccion = $_POST['id_direccion'];
+    $id_nombre = isset($_POST['id_nombre']) ? $_POST['id_nombre'] : null;
+    $id_direccion = isset($_POST['id_direccion']) ? $_POST['id_direccion'] : null;
 
     if ($modo === "nuevo") {
-
-        $stmt = $conexion->prepare("INSERT INTO cliente_nombre (nombre_cliente) VALUES (?)");
-        $stmt->bind_param("s", $nombre);
-        $stmt->execute();
-        $id_nombre = $conexion->insert_id;
-        $stmt->close();
-
-        $stmt = $conexion->prepare("INSERT INTO cliente_direccion (direccion_del_cliente) VALUES (?)");
-        $stmt->bind_param("s", $direccion);
-        $stmt->execute();
-        $id_direccion = $conexion->insert_id;
-        $stmt->close();
-
-        $stmt = $conexion->prepare("
-            INSERT INTO cliente (ruc_cliente, id_nombrecliente, id_direccioncliente)
-            VALUES (?, ?, ?)
-        ");
-        $stmt->bind_param("sii", $ruc, $id_nombre, $id_direccion);
+        // Llamar al procedimiento almacenado para insertar
+        $stmt = $conexion->prepare("CALL sp_insert_cliente(?, ?, ?)");
+        $stmt->bind_param("sss", $ruc, $nombre, $direccion);
         $stmt->execute();
         $stmt->close();
 
     } else {
-
-        $stmt = $conexion->prepare("
-            UPDATE cliente_nombre SET nombre_cliente=? WHERE id_nombre_cliente=?
-        ");
-        $stmt->bind_param("si", $nombre, $id_nombre);
-        $stmt->execute();
-        $stmt->close();
-
-        $stmt = $conexion->prepare("
-            UPDATE cliente_direccion SET direccion_del_cliente=? WHERE id_direccioncliente=?
-        ");
-        $stmt->bind_param("si", $direccion, $id_direccion);
+        // $id_nombre y $id_direccion deben tener valores (ints)
+        // Llamar al procedimiento almacenado para actualizar
+        $stmt = $conexion->prepare("CALL sp_update_cliente(?, ?, ?, ?, ?)");
+        // parametros: p_ruc, p_id_nombre, p_id_direccion, p_nombre, p_direccion
+        $stmt->bind_param("siiss", $ruc, $id_nombre, $id_direccion, $nombre, $direccion);
         $stmt->execute();
         $stmt->close();
     }

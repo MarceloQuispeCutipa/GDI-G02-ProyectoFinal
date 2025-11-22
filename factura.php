@@ -7,7 +7,7 @@ if (!$numero_factura) {
     die("Número de factura no proporcionado.");
 }
 
-// Query (igual a la que tú mostraste)
+
 $sql = "
 SELECT
     f.`Numero_Factura`,
