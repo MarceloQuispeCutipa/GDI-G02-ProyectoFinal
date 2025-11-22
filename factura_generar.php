@@ -1,182 +1,188 @@
 <?php
+// factura_crear.php
 session_start();
 require_once "conexion.php";
 
-/* Normalizar variable de conexión */
-if (isset($conexion) && $conexion instanceof mysqli) {
-    $conn = $conexion;
-} else {
-    die("Error: No se pudo establecer conexión con la base de datos.");
+// Mostrar errores en desarrollo (comenta en producción)
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+/*
+  Manejo del botón "Vaciar carrito".
+  Tu UI envía este botón al mismo script; si se detecta, vaciamos y volvemos.
+*/
+if (isset($_POST['vaciar_carrito'])) {
+    unset($_SESSION['carrito']);
+    // Redirigir de vuelta a la página previa si existe
+    $back = $_SERVER['HTTP_REFERER'] ?? 'factura_crear.php';
+    header("Location: " . $back);
+    exit;
 }
 
-/* Verificar que haya carrito */
-if (!isset($_SESSION['carrito']) || empty($_SESSION['carrito'])) {
-    die("Error: El carrito está vacío.");
+/* Validar carrito */
+if (!isset($_SESSION['carrito']) || count($_SESSION['carrito']) === 0) {
+    die("Error: El carrito está vacío. Agrega productos antes de generar la factura.");
 }
 
-/* Recibir datos del formulario */
-if (!isset($_POST['dni_empleado'], $_POST['ruc_cliente'])) {
-    die("Error: faltan datos obligatorios (DNI empleado y RUC cliente).");
+/* MAPEO DE CAMPOS POST (acepta varias variantes) */
+$ruc_empresa = $_POST['ruc_empresa'] ?? $_POST['empresa'] ?? null;
+// empleado: aceptamos 'dni_empleado' o 'empleado_factura'
+$dni_empleado = $_POST['dni_empleado'] ?? $_POST['empleado_factura'] ?? null;
+// cliente: aceptamos 'ruc_cliente' o 'cliente' (tu BD usa RUC_Cliente)
+$ruc_cliente = $_POST['ruc_cliente'] ?? $_POST['cliente'] ?? null;
+// tipo de moneda opcional
+$tipo_moneda = $_POST['tipo_moneda'] ?? 'PEN';
+
+if (!$ruc_empresa || !$dni_empleado || !$ruc_cliente) {
+    die("Faltan datos obligatorios (empresa, empleado o cliente).");
 }
 
-$dni_empleado = trim($_POST['dni_empleado']);
-$ruc_cliente = trim($_POST['ruc_cliente']);
-
-/* Verificar que el empleado exista y obtener su RUC_Empresa */
-$sqlEmp = "SELECT RUC_Empresa FROM Empleado WHERE DNI = ?";
-$stmt = $conn->prepare($sqlEmp);
+/* VALIDACIONES BÁSICAS: existencia de empleado y cliente en BD */
+$stmt = $conexion->prepare("SELECT RUC_Empresa FROM Empleado WHERE DNI = ? LIMIT 1");
 $stmt->bind_param("s", $dni_empleado);
 $stmt->execute();
-$resEmp = $stmt->get_result();
-
-if ($resEmp->num_rows === 0) {
-    die("Error: No se encontró empleado válido para el DNI: $dni_empleado");
+$res = $stmt->get_result();
+if ($res->num_rows === 0) {
+    $stmt->close();
+    die("Error: Empleado no válido (DNI).");
 }
-
-$empleado = $resEmp->fetch_assoc();
-$ruc_empresa = $empleado['RUC_Empresa'];
+$row = $res->fetch_assoc();
+$empresa_del_empleado = $row['RUC_Empresa'];
 $stmt->close();
 
-/* Verificar que el cliente exista */
-$sqlCli = "
-    SELECT c.RUC_Cliente, cn.Nombre_Cliente, cd.Direccion_del_Cliente
-    FROM Cliente c
-    LEFT JOIN Cliente_Nombre cn ON c.ID_NombreCliente = cn.ID_Nombre_Cliente
-    LEFT JOIN Cliente_Direccion cd ON c.ID_DireccionCliente = cd.ID_DireccionCliente
-    WHERE c.RUC_Cliente = ?
-";
-$stmt = $conn->prepare($sqlCli);
+// Opcional: podríamos validar que $empresa_del_empleado == $ruc_empresa, pero lo dejamos flexible.
+
+$stmt = $conexion->prepare("SELECT RUC_Cliente FROM Cliente WHERE RUC_Cliente = ? LIMIT 1");
 $stmt->bind_param("s", $ruc_cliente);
 $stmt->execute();
-$resCli = $stmt->get_result();
-
-if ($resCli->num_rows === 0) {
-    die("Error: No se encontró cliente válido para el RUC: $ruc_cliente");
+$res = $stmt->get_result();
+if ($res->num_rows === 0) {
+    $stmt->close();
+    die("Error: Cliente no encontrado (RUC).");
 }
-$cliente = $resCli->fetch_assoc();
 $stmt->close();
 
-/* Generar número de factura único */
-$numeroFactura = rand(1000, 9999);
-
-/* Calcular totales */
-$subtotal = 0;
+/* CALCULAR TOTALES desde carrito */
+$subtotal = 0.0;
 foreach ($_SESSION['carrito'] as $item) {
-    $subtotal += $item['precio'] * $item['cantidad'];
+    $precio = floatval($item['precio']);
+    $cantidad = intval($item['cantidad']);
+    $subtotal += $precio * $cantidad;
 }
-$igv = $subtotal * 0.18;
-$total = $subtotal + $igv;
+$subtotal = round($subtotal, 2);
+$igv = round($subtotal * 0.18, 2);
+$total = round($subtotal + $igv, 2);
 
-/* INSERTAR FACTURA */
-$sqlFactura = "INSERT INTO Factura 
-(Número_Factura, RUC_Empresa, DNI_Empleado, Sub_total_ventas, IGV, Valor_venta, Importe_total)
-VALUES (?, ?, ?, ?, ?, ?, ?)";
+/* GENERAR Numero_Factura único (formato FNNN) */
+do {
+    $num = random_int(1, 999);
+    $numero_factura = 'F' . str_pad($num, 3, "0", STR_PAD_LEFT); // F001..F999
+    $chk = $conexion->prepare("SELECT 1 FROM Factura WHERE Numero_Factura = ? LIMIT 1");
+    $chk->bind_param("s", $numero_factura);
+    $chk->execute();
+    $r = $chk->get_result();
+    $exists = ($r->num_rows > 0);
+    $chk->close();
+} while ($exists);
 
-$stmt = $conn->prepare($sqlFactura);
-$stmt->bind_param("sssdddd", $numeroFactura, $ruc_empresa, $dni_empleado, $subtotal, $igv, $subtotal, $total);
+/* Nombre de la hoja del pedido: seguimos tu convención P + número */
+$nombreHoja = 'P' . substr($numero_factura, 1); // si F001 -> P001
 
-if (!$stmt->execute()) {
-    die("Error al insertar factura: " . $conn->error);
+/* Iniciamos transacción */
+$conexion->begin_transaction();
+
+try {
+    // Insertar Factura
+    $stmt = $conexion->prepare("
+        INSERT INTO Factura
+        (Numero_Factura, Tipo_de_moneda, Observaciones, Importe_total, IGV, Valor_venta, Sub_total_ventas, Fecha_de_emision, RUC_Empresa, DNI_Empleado)
+        VALUES (?, ?, '', ?, ?, ?, ?, CURDATE(), ?, ?)
+    ");
+    // Tu esquema usa INT para montos; convertimos a enteros (si quieres centavos, cambia a DECIMAL en BD)
+    $importe_int = (int) round($total);
+    $igv_int = (int) round($igv);
+    $valor_venta_int = (int) round($subtotal);
+    $sub_total_int = (int) round($subtotal);
+
+    // Tipos: s s i i i i s s  => "ssi iiiss" -> compact: "siiiisss"? We'll build exact:
+    // Parameters order: numero_factura (s), tipo_moneda (s), Importe_total (i), IGV (i), Valor_venta (i), Sub_total_ventas (i), ruc_empresa (s), dni_empleado (s)
+    $stmt->bind_param("siiiisss",
+        $numero_factura,
+        $tipo_moneda,
+        $importe_int,
+        $igv_int,
+        $valor_venta_int,
+        $sub_total_int,
+        $ruc_empresa,
+        $dni_empleado
+    );
+    $stmt->execute();
+    $stmt->close();
+
+    // Insertar Pedido
+    $stmt = $conexion->prepare("
+        INSERT INTO Pedido (Nombre_de_la_hoja, RUC_Cliente, DNI_Empleado, Numero_de_factura)
+        VALUES (?, ?, ?, ?)
+    ");
+    $stmt->bind_param("ssss", $nombreHoja, $ruc_cliente, $dni_empleado, $numero_factura);
+    $stmt->execute();
+    $stmt->close();
+
+    // Insertar Pedido_Producto (cada producto => una fila). ID_Pedido_Producto será PP + contador
+    $stmt = $conexion->prepare("
+        INSERT INTO Pedido_Producto (ID_Pedido_Producto, NombreDeLaHoja_Pedido, Cantidad, ID_Producto)
+        VALUES (?, ?, ?, ?)
+    ");
+    $contador = 1;
+    foreach ($_SESSION['carrito'] as $item) {
+        $idPedidoProd = 'PP' . str_pad($contador, 2, "0", STR_PAD_LEFT); // PP01..
+        $cantidad = intval($item['cantidad']);
+        $idProducto = $item['id'];
+        $stmt->bind_param("ssis", $idPedidoProd, $nombreHoja, $cantidad, $idProducto);
+        $stmt->execute();
+        $contador++;
+    }
+    $stmt->close();
+
+    // Insertar Precios_Pedido (ID_Precios = max+1)
+    $res = $conexion->query("SELECT COALESCE(MAX(ID_Precios),0)+1 AS next_id FROM Precios_Pedido");
+    $row = $res->fetch_assoc();
+    $nextPrecioId = intval($row['next_id']);
+
+    $stmt = $conexion->prepare("
+        INSERT INTO Precios_Pedido (ID_Precios, NombreDeLaHoja_Pedido, Costo_Total, Precio_sin_IGV, Precio_total)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+    // En tu esquema esos campos son VARCHAR; guardamos cadenas con dos decimales
+    $costo_total_str = number_format($subtotal, 2, '.', '');
+    $precio_sin_igv_str = number_format($subtotal, 2, '.', '');
+    $precio_total_str = number_format($total, 2, '.', '');
+
+    $stmt->bind_param("issss", $nextPrecioId, $nombreHoja, $costo_total_str, $precio_sin_igv_str, $precio_total_str);
+    $stmt->execute();
+    $stmt->close();
+
+    // Commit
+    $conexion->commit();
+
+    // Guardar respaldo para mostrar en factura (opcional)
+    $_SESSION['carrito_backup'] = $_SESSION['carrito'];
+    $_SESSION['numero_factura'] = $numero_factura;
+    $_SESSION['cliente_factura'] = $ruc_cliente;
+    $_SESSION['empleado_factura'] = $dni_empleado;
+    $_SESSION['subtotal_factura'] = $subtotal;
+    $_SESSION['igv_factura'] = $igv;
+    $_SESSION['total_factura'] = $total;
+
+    // Vaciar carrito actual
+    unset($_SESSION['carrito']);
+
+    // Redirigir a la vista de la factura
+    header("Location: factura.php?numero_factura=" . urlencode($numero_factura));
+    exit;
+
+} catch (Exception $e) {
+    $conexion->rollback();
+    // Para depuración:
+    die("Error al generar la factura: " . $e->getMessage());
 }
-$stmt->close();
-
-/* INSERTAR PEDIDO */
-$nombreHoja = "Pedido_" . $numeroFactura;
-$sqlPedido = "INSERT INTO Pedido (Nombre_de_la_hoja, Fecha_de_emision, RUC_Cliente, DNI_Empleado, Número_de_factura)
-              VALUES (?, CURDATE(), ?, ?, ?)";
-$stmt = $conn->prepare($sqlPedido);
-$stmt->bind_param("ssss", $nombreHoja, $ruc_cliente, $dni_empleado, $numeroFactura);
-$stmt->execute();
-$stmt->close();
-
-/* INSERTAR PRODUCTOS EN PEDIDO_PRODUCTO */
-$sqlProducto = "INSERT INTO Pedido_Producto (ID_Pedido_Producto, NombreDeLaHoja_Pedido, Cantidad, ID_Producto)
-                VALUES (?, ?, ?, ?)";
-$stmtProd = $conn->prepare($sqlProducto);
-
-$contadorProd = 1;
-foreach ($_SESSION['carrito'] as $item) {
-    $idPedidoProd = str_pad($contadorProd, 4, "0", STR_PAD_LEFT);
-    $stmtProd->bind_param("ssis", $idPedidoProd, $nombreHoja, $item['cantidad'], $item['id']);
-    $stmtProd->execute();
-    $contadorProd++;
-}
-$stmtProd->close();
-
-/* INSERTAR PRECIOS_PEDIDO */
-$sqlPrecios = "INSERT INTO Precios_Pedido 
-(ID_Precios, NombreDeLaHoja_Pedido, Costo_Total, Precio_sin_IGV, Precio_total)
-VALUES (?, ?, ?, ?, ?)";
-$stmtPrecio = $conn->prepare($sqlPrecios);
-
-$idPrecio = 1;
-$precio_sin_igv = $subtotal;
-$costo_total = $subtotal;
-$precio_total = $total;
-$stmtPrecio->bind_param("issss", $idPrecio, $nombreHoja, $costo_total, $precio_sin_igv, $precio_total);
-$stmtPrecio->execute();
-$stmtPrecio->close();
-
-/* Guardar carrito temporal para mostrar */
-$_SESSION['carrito_backup'] = $_SESSION['carrito'];
-unset($_SESSION['carrito']);
-
-?>
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Factura Generada</title>
-    <link rel="stylesheet" href="estilos.css">
-</head>
-<body>
-<header>
-    <h1>Factura Emitida</h1>
-</header>
-
-<main class="contenedor">
-
-    <div class="tarjeta">
-        <h2>Factura Nº <?= $numeroFactura ?></h2>
-
-        <p><strong>Cliente:</strong> <?= htmlspecialchars($cliente['Nombre_Cliente']) ?></p>
-        <p><strong>RUC:</strong> <?= htmlspecialchars($cliente['RUC_Cliente']) ?></p>
-        <p><strong>Dirección:</strong> <?= htmlspecialchars($cliente['Direccion_del_Cliente']) ?></p>
-
-        <h3>Detalle de productos</h3>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Producto</th>
-                    <th>Cantidad</th>
-                    <th>Precio Unit.</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($_SESSION['carrito_backup'] as $item): ?>
-                    <tr>
-                        <td><?= $item['id'] ?></td>
-                        <td><?= $item['cantidad'] ?></td>
-                        <td><?= number_format($item['precio'], 2) ?></td>
-                        <td><?= number_format($item['precio'] * $item['cantidad'], 2) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-
-        <h3>Totales</h3>
-        <p><strong>Subtotal:</strong> S/ <?= number_format($subtotal, 2) ?></p>
-        <p><strong>IGV (18%):</strong> S/ <?= number_format($igv, 2) ?></p>
-        <p><strong>Total:</strong> S/ <?= number_format($total, 2) ?></p>
-
-        <a class="btn btn-crear" href="factura_pdf.php?factura=<?= $numeroFactura ?>">Descargar PDF</a>
-        <br><br>
-        <a class="btn" href="index.php">Volver al Menú</a>
-    </div>
-
-</main>
-</body>
-</html>

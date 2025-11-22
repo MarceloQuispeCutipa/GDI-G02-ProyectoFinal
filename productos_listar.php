@@ -28,7 +28,7 @@ require_once "header.php";
                         <a class='btn btn-editar' href='productos_form.php?id={$row['idproducto']}'>Editar</a>
                         <a class='btn btn-eliminar' href='productos_eliminar.php?id={$row['idproducto']}' onclick=\"return confirm('¿Seguro de eliminar el producto {$row['idproducto']}?');\">Eliminar</a>
                     </td>
-                  </tr>";
+                </tr>";
         }
         ?>
     </table>
