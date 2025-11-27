@@ -1,50 +1,31 @@
 <?php
-require_once "conexion.php";
-require_once "header.php";
+require_once __DIR__ . '/views/header.php';
 ?>
-
-<section class="contenedor">
-    <h2>Bienvenido al sistema DARISA</h2>
-
+<main class="contenedor">
+    <h2>Panel principal</h2>
     <div class="tarjetas">
-        <div class="tarjeta">
-            <h3>Ver Productos</h3>
-            <p>Aqui puede ver y gestionar los productos.</p>
-            <a class="btn btn-crear" style="margin-top: 20px"  href="productos_listar.php">Ver productos</a>
-        </div>
-
-        <div class="tarjeta">
-            <h3>Ver Empleados</h3>
-            <p>Aqui puede ver los empleados y gestionarlos.</p>
-            <a class="btn btn-crear" style="margin-top: 20px" href="empleados_listar.php">Ver empleados</a>
-        </div>
-
-        <div class="tarjeta">
-            <h3>Ver Clientes</h3>
-            <p>Aqui puede gestionar los clientes o agregar un nuevo cliente.</p>
-            <a class="btn btn-crear" style="margin-top: 20px" href="clientes_listar.php">Ver Empresas</a>
-        </div>
-
-        <div class="tarjeta">
-            <h3>Emisión de Facturas</h3>
-            <p>Aqui puede emitir nuevas facturas.</p>
-            <a class="btn btn-crear" style="margin-top: 20px" href="factura_crear.php">Emitir Factura</a>
-        </div>
-
-        <div class="tarjeta">
-            <h3>Ver Pedidos</h3>
-            <p>Aqui puede ver y gestionar los pedidos.</p>
-            <a class="btn btn-crear" style="margin-top: 20px" href="pedidos.php">Ver Pedidos</a>
-        </div>
-
-        <div class="tarjeta">
-            <h3>Ver Consultas</h3>
-            <p>Aqui puede ver y realizar consultas.</p>
-            <a class="btn btn-crear" style="margin-top: 20px" href="consultas.php">Ver Consultas</a>
-        </div>
-
-</section>
-
+        <a class="tarjeta" href="clientes/clientes_listar.php">
+            <h3>Clientes</h3>
+            <p>Registrar, editar y eliminar clientes.</p>
+        </a>
+        <a class="tarjeta" href="empleados/empleados_listar.php">
+            <h3>Empleados</h3>
+            <p>Gestionar los datos de los empleados.</p>
+        </a>
+        <a class="tarjeta" href="productos/productos_listar.php">
+            <h3>Productos</h3>
+            <p>Gestionar catálogo, unidades y stock.</p>
+        </a>
+        <a class="tarjeta" href="facturas/factura_crear.php">
+            <h3>Emitir factura</h3>
+            <p>Seleccionar cliente, agregar productos y emitir.</p>
+        </a>
+        <a class="tarjeta" href="reportes/consultas.php">
+            <h3>Consultas y reportes</h3>
+            <p>Listados de facturas, pedidos y auditorías.</p>
+        </a>
+    </div>
+</main>
 <?php
-require_once "footer.php";
+require_once __DIR__ . '/views/footer.php';
 ?>
